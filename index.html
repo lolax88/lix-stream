@@ -792,12 +792,17 @@ const STREAM_SOURCES = {
         quality: "HD"
     },
     source2: {
-        name: "📺 Source 2",
-        url: "https://www.scorebat.com/video/embed/",
+        name: "📺 FCTV33 / Rbtvplus18",
+        url: "https://www.rbtvplus18.pics/id/football.html",
         quality: "HD"
     },
     source3: {
-        name: "🌐 Source 3",
+        name: "🌐 ScoreBat",
+        url: "https://www.scorebat.com/video/embed/",
+        quality: "HD"
+    },
+    source4: {
+        name: "📡 TVP Sport",
         url: "https://tvpstream.vod.tvp.pl/",
         quality: "SD"
     }
@@ -1258,6 +1263,7 @@ function loadSource(match, sourceIndex) {
     // Different URL patterns for different sources
     const urls = [
         `https://embedsports.top/embed/${searchQuery}`,
+        `https://www.rbtvplus18.pics/id/football.html`,
         `https://www.scorebat.com/video/embed/`,
         `https://tvpstream.vod.tvp.pl/`
     ];
