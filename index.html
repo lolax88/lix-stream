@@ -160,11 +160,50 @@
             border: 1px solid var(--border);
         }
 
-        .player-wrapper iframe {
+        .player-wrapper iframe,
+        .player-wrapper video {
             width: 100%;
             height: 100%;
             border: none;
+            background: #000;
+            object-fit: contain;
         }
+
+        /* Stream quality badge */
+        .quality-badge {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(10px);
+            color: var(--accent);
+            font-size: 11px;
+            font-weight: 700;
+            z-index: 10;
+            letter-spacing: 0.5px;
+        }
+
+        .stream-status {
+            position: absolute;
+            top: 12px;
+            right: 60px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(10px);
+            font-size: 11px;
+            font-weight: 600;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stream-status.live { color: var(--green); }
+        .stream-status.error { color: var(--red); }
+        .stream-status.loading { color: var(--yellow); }
 
         .player-placeholder {
             width: 100%;
@@ -869,7 +908,7 @@
     <div class="player-section">
         <div class="ad-block-notice">
             <span class="icon">🛡️</span>
-            <span>Ad-Free Mode Active — Zero iklan, zero popups. Nikmatin Piala Dunia tanpa gangguan.</span>
+            <span>Ad-Free Mode Active — 14 verified M3U8 sources. HD streams via HLS.js player.</span>
         </div>
 
         <div class="player-wrapper" id="player-container">
@@ -877,6 +916,12 @@
                 <div class="big-icon">⚽</div>
                 <p>Pilih pertandingan dari sidebar →</p>
                 <p style="font-size:13px; opacity:0.5;">Klik match card untuk mulai nonton</p>
+            </div>
+            <video id="stream-video" style="display:none;" controls autoplay muted playsinline></video>
+            <div class="quality-badge" id="quality-badge" style="display:none;"></div>
+            <div class="stream-status" id="stream-status" style="display:none;">
+                <span class="live-dot"></span>
+                <span id="stream-status-text">Connecting...</span>
             </div>
             <iframe id="stream-frame" style="display:none;" allowfullscreen></iframe>
             <button class="fullscreen-btn" onclick="goFullscreen()" style="display:none;" id="fs-btn">⛶ Fullscreen</button>
@@ -973,30 +1018,97 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
 <script>
-// ==================== DATA ====================
-const STREAM_SOURCES = {
-    source1: {
-        name: "⚽ Source 1 (Recommended)",
-        url: "https://embedsports.top/embed/",
-        quality: "HD"
+const STREAM_SOURCES = [
+    {
+        name: "beIN SPORTS XTRA",
+        url: "https://bein-xtra-bein.amagi.tv/playlist.m3u8",
+        quality: "1080p",
+        type: "m3u8"
     },
-    source2: {
-        name: "📺 FCTV33 / Rbtvplus18",
-        url: "https://www.rbtvplus18.pics/id/football.html",
-        quality: "HD"
+    {
+        name: "beIN Sports XTRA ES",
+        url: "https://dc1644a9jazgj.cloudfront.net/beIN_Sports_Xtra_Espanol.m3u8",
+        quality: "1080p",
+        type: "m3u8"
     },
-    source3: {
-        name: "🌐 ScoreBat",
-        url: "https://www.scorebat.com/video/embed/",
-        quality: "HD"
+    {
+        name: "FIFA+ English",
+        url: "https://jmp2.uk/plu-660c29b5aec9680008f5b4a4.m3u8",
+        quality: "720p",
+        type: "m3u8"
     },
-    source4: {
-        name: "📡 TVP Sport",
-        url: "https://tvpstream.vod.tvp.pl/",
-        quality: "SD"
+    {
+        name: "Fox Sports (LatAm)",
+        url: "https://jmp2.uk/plu-5a74b8e1e22a61737979c6bf.m3u8",
+        quality: "720p",
+        type: "m3u8"
+    },
+    {
+        name: "Alkass One",
+        url: "https://liveeu-gcp.alkassdigital.net/alkass1-p/main.m3u8",
+        quality: "1080p",
+        type: "m3u8"
+    },
+    {
+        name: "Alkass Two",
+        url: "https://liveeu-gcp.alkassdigital.net/alkass2-p/main.m3u8",
+        quality: "1080p",
+        type: "m3u8"
+    },
+    {
+        name: "Gol Classics",
+        url: "https://d71gqtnep83vb.cloudfront.net/gol_classics/gol_classics.m3u8",
+        quality: "1080p",
+        type: "m3u8"
+    },
+    {
+        name: "ESPN8 The Ocho",
+        url: "https://d3b6q2ou5kp8ke.cloudfront.net/ESPNTheOcho.m3u8",
+        quality: "720p",
+        type: "m3u8"
+    },
+    {
+        name: "TyC Sports",
+        url: "https://amg26268-amg26268c14-freelivesports-emea-10267.playouts.now.amagi.tv/ts-us-e2-n2/playlist/amg26268-sportsstudio-tycsports-freelivesportsemea/playlist.m3u8",
+        quality: "1080p",
+        type: "m3u8"
+    },
+    {
+        name: "TSN The Ocho",
+        url: "https://d3pnbvng3bx2nj.cloudfront.net/v1/master/3722c60a815c199d9c0ef36c5b73da68a62b09d1/cc-rds8g35qfqrnv/TSN_The_Ocho.m3u8",
+        quality: "1080p",
+        type: "m3u8"
+    },
+    {
+        name: "Africa 24 Sport",
+        url: "https://africa24.vedge.infomaniak.com/livecast/ik:africa24sport/manifest.m3u8",
+        quality: "1080p",
+        type: "m3u8"
+    },
+    {
+        name: "A Spor Turkey",
+        url: "https://rnttwmjcin.turknet.ercdn.net/lcpmvefbyo/aspor/aspor.m3u8",
+        quality: "1080p",
+        type: "m3u8"
+    },
+    {
+        name: "HTSpor TV",
+        url: "https://ciner.daioncdn.net/ht-spor/ht-spor.m3u8?app=web",
+        quality: "1080p",
+        type: "m3u8"
+    },
+    {
+        name: "Al Iraqia Sport",
+        url: "https://imn-live.esite-lab.com/hls/iraqia-sports-1.m3u8",
+        quality: "720p",
+        type: "m3u8"
     }
-};
+];
+
+// HLS.js player instance
+let hlsPlayer = null;
 
 // FIFA World Cup 2026 Schedule
 const MATCHES = [
@@ -1399,15 +1511,17 @@ function selectMatch(matchId) {
 
     // Update player
     const placeholder = document.getElementById('player-placeholder');
+    const video = document.getElementById('stream-video');
     const frame = document.getElementById('stream-frame');
     const fsBtn = document.getElementById('fs-btn');
 
     placeholder.style.display = 'none';
-    frame.style.display = 'block';
+    frame.style.display = 'none';
+    video.style.display = 'block';
     fsBtn.style.display = 'block';
 
     // Load stream
-    loadStream(match);
+    playStream(0);
 
     // Update match info
     const infoEl = document.getElementById('current-match-info');
@@ -1426,41 +1540,127 @@ function selectMatch(matchId) {
     showToast(`📺 Loading ${match.home} vs ${match.away}...`);
 }
 
-function loadStream(match) {
+function playStream(sourceIndex) {
+    const video = document.getElementById('stream-video');
     const frame = document.getElementById('stream-frame');
-    // Use generic FIFA stream search
-    const searchQuery = `${match.home} vs ${match.away} live stream`.toLowerCase().replace(/ /g, '-');
-    frame.src = `https://embedsports.top/embed/${searchQuery}`;
-}
+    const qualityBadge = document.getElementById('quality-badge');
+    const streamStatus = document.getElementById('stream-status');
+    const statusText = document.getElementById('stream-status-text');
+    const source = STREAM_SOURCES[sourceIndex];
 
-function loadSource(match, sourceIndex) {
-    const frame = document.getElementById('stream-frame');
-    const source = Object.values(STREAM_SOURCES)[sourceIndex];
-    const searchQuery = `${match.home} vs ${match.away}`.toLowerCase().replace(/ /g, '-');
+    if (!source) return;
 
-    // Different URL patterns for different sources
-    const urls = [
-        `https://embedsports.top/embed/${searchQuery}`,
-        `https://www.rbtvplus18.pics/id/football.html`,
-        `https://www.scorebat.com/video/embed/`,
-        `https://tvpstream.vod.tvp.pl/`
-    ];
-
-    frame.src = urls[sourceIndex] || urls[0];
     currentSource = sourceIndex;
-    renderSourceButtons(match);
-    showToast(`🔄 Switching to ${source.name}...`);
+
+    // Clean up previous HLS instance
+    if (hlsPlayer) {
+        hlsPlayer.destroy();
+        hlsPlayer = null;
+    }
+
+    // Show video, hide iframe
+    video.style.display = 'block';
+    frame.style.display = 'none';
+
+    // Update quality badge
+    qualityBadge.style.display = 'block';
+    qualityBadge.textContent = source.quality;
+
+    // Show loading status
+    streamStatus.style.display = 'flex';
+    streamStatus.className = 'stream-status loading';
+    statusText.textContent = 'Connecting...';
+
+    if (source.type === 'm3u8') {
+        if (Hls.isSupported()) {
+            hlsPlayer = new Hls({
+                maxBufferLength: 30,
+                maxMaxBufferLength: 60,
+                enableWorker: true,
+                lowLatencyMode: true
+            });
+            hlsPlayer.loadSource(source.url);
+            hlsPlayer.attachMedia(video);
+
+            hlsPlayer.on(Hls.Events.MANIFEST_PARSED, function() {
+                video.play().catch(() => {});
+                streamStatus.className = 'stream-status live';
+                statusText.textContent = 'LIVE';
+                showToast(`✅ ${source.name} connected — ${source.quality}`);
+            });
+
+            hlsPlayer.on(Hls.Events.ERROR, function(event, data) {
+                if (data.fatal) {
+                    console.error('HLS fatal error:', data.type, data.details);
+                    streamStatus.className = 'stream-status error';
+                    statusText.textContent = 'Error';
+                    if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                        hlsPlayer.recoverMediaError();
+                    } else if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                        showToast(`⚠️ ${source.name} network error — try another source`);
+                    } else {
+                        showToast(`⚠️ ${source.name} failed — try another source`);
+                    }
+                }
+            });
+
+            hlsPlayer.on(Hls.Events.FRAG_LOADED, function() {
+                streamStatus.className = 'stream-status live';
+                statusText.textContent = 'LIVE';
+            });
+        } else if (video.canPlayType && video.canPlayType('application/vnd.apple.mpegurl')) {
+            // Safari native HLS support
+            video.src = source.url;
+            video.addEventListener('loadedmetadata', function() {
+                video.play().catch(() => {});
+                streamStatus.className = 'stream-status live';
+                statusText.textContent = 'LIVE';
+                showToast(`✅ ${source.name} connected — ${source.quality}`);
+            });
+            video.addEventListener('error', function() {
+                streamStatus.className = 'stream-status error';
+                statusText.textContent = 'Error';
+                showToast(`⚠️ ${source.name} failed — try another source`);
+            });
+        } else {
+            // Fallback: try iframe with video tag
+            video.style.display = 'none';
+            frame.style.display = 'block';
+            frame.src = source.url;
+            streamStatus.className = 'stream-status live';
+            statusText.textContent = 'LIVE';
+            showToast(`📺 ${source.name} loaded (fallback mode)`);
+        }
+    }
+
+    // Update source buttons
+    if (currentMatch) renderSourceButtons(currentMatch);
 }
 
 function renderSourceButtons(match) {
     const container = document.getElementById('stream-sources');
-    const sources = Object.values(STREAM_SOURCES);
-    container.innerHTML = sources.map((s, i) => `
+    // Show first 8 sources as buttons
+    const sourcesToShow = STREAM_SOURCES.slice(0, 8);
+    container.innerHTML = sourcesToShow.map((s, i) => `
         <button class="source-btn ${i === currentSource ? 'active' : ''}"
-                onclick="loadSource(MATCHES.find(m=>m.id==='${match.id}'), ${i})">
+                onclick="playStream(${i})">
             ${s.name} (${s.quality})
         </button>
-    `).join('');
+    `).join('') + `
+        <select onchange="playStream(parseInt(this.value)); this.blur();" style="
+            padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border);
+            background: var(--bg-card); color: var(--gray); font-size: 12px;
+            font-weight: 600; font-family: inherit; cursor: pointer; outline: none;
+        ">
+            <option value="" disabled selected style="color:var(--accent);">+ More Sources</option>
+            ${STREAM_SOURCES.map((s, i) => `
+                <option value="${i}" ${i === currentSource ? 'selected' : ''}
+                    style="background:var(--bg-card); color:var(--white);">
+                    ${s.name} (${s.quality})
+                </option>
+            `).join('')}
+        </select>
+    `;
 }
 
 function autoSelectLiveMatch() {
@@ -1489,10 +1689,13 @@ function goFullscreen() {
 }
 
 function togglePIP() {
-    const frame = document.getElementById('stream-frame');
-    if (frame.requestPictureInPicture) {
-        frame.requestPictureInPicture();
-        showToast('📌 Picture-in-Picture activated');
+    const video = document.getElementById('stream-video');
+    if (video && video.requestPictureInPicture) {
+        video.requestPictureInPicture().then(() => {
+            showToast('📌 Picture-in-Picture activated');
+        }).catch(() => {
+            showToast('⚠️ PiP requires user interaction first');
+        });
     } else {
         showToast('⚠️ PiP not supported in this browser');
     }
@@ -1500,7 +1703,7 @@ function togglePIP() {
 
 function refreshStream() {
     if (currentMatch) {
-        loadStream(currentMatch);
+        playStream(currentSource);
         showToast('🔄 Stream refreshed');
     }
 }
