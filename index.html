@@ -677,6 +677,176 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        /* STANDINGS / KLASEMEN */
+        .standings-section {
+            padding: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .standings-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .standings-header h2 {
+            font-size: 22px;
+            font-weight: 800;
+        }
+
+        .standings-source {
+            font-size: 12px;
+            color: var(--gray);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .standings-source .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+        }
+
+        .standings-source .dot.offline {
+            background: var(--yellow);
+        }
+
+        .standings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 16px;
+        }
+
+        .group-card {
+            background: var(--bg-card);
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+
+        .group-card:hover {
+            border-color: rgba(139, 92, 246, 0.3);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .group-card-header {
+            padding: 14px 18px;
+            background: linear-gradient(135deg, rgba(139,92,246,0.15), rgba(139,92,246,0.05));
+            border-bottom: 1px solid var(--border);
+            font-weight: 700;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .group-card-header .group-letter {
+            background: var(--accent);
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .standings-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .standings-table thead th {
+            padding: 10px 8px;
+            text-align: center;
+            color: var(--gray);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .standings-table thead th:first-child,
+        .standings-table thead th:nth-child(2) {
+            text-align: left;
+        }
+
+        .standings-table tbody tr {
+            border-bottom: 1px solid var(--border);
+            transition: background 0.15s;
+        }
+
+        .standings-table tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        .standings-table tbody tr:hover {
+            background: var(--bg-hover);
+        }
+
+        .standings-table tbody td {
+            padding: 10px 8px;
+            text-align: center;
+            color: var(--white);
+        }
+
+        .standings-table tbody td:first-child {
+            text-align: center;
+            color: var(--gray);
+            font-weight: 600;
+            width: 30px;
+        }
+
+        .standings-table tbody td:nth-child(2) {
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .standings-table .team-cell {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .standings-table .pts-cell {
+            font-weight: 800;
+            color: var(--accent);
+        }
+
+        .standings-table .gd-positive {
+            color: var(--green);
+        }
+
+        .standings-table .gd-negative {
+            color: var(--red);
+        }
+
+        .standings-table .gd-zero {
+            color: var(--gray);
+        }
+
+        .standings-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            gap: 16px;
+            color: var(--gray);
+        }
+
     </style>
 </head>
 <body>
@@ -690,6 +860,7 @@
         <button class="nav-pill active" onclick="showSection('live')">🔴 LIVE</button>
         <button class="nav-pill" onclick="showSection('schedule')">📅 Jadwal</button>
         <button class="nav-pill" onclick="showSection('highlights')">🎬 Highlights</button>
+        <button class="nav-pill" onclick="showSection('standings')">📊 Klasemen</button>
     </div>
 </header>
 
@@ -782,6 +953,25 @@
 
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
+
+<!-- STANDINGS SECTION -->
+<div id="section-standings" style="display:none;">
+    <div class="standings-section">
+        <div class="standings-header">
+            <h2>📊 Klasemen Piala Dunia 2026</h2>
+            <div class="standings-source" id="standings-source">
+                <span class="dot"></span>
+                <span>FIFA API — Live</span>
+            </div>
+        </div>
+        <div id="standings-container">
+            <div class="standings-loading">
+                <div class="loading-spinner"></div>
+                <span>Memuat klasemen dari FIFA...</span>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
 // ==================== DATA ====================
@@ -1284,6 +1474,9 @@ function showSection(section) {
     document.getElementById('section-live').style.display = section === 'live' ? 'grid' : 'none';
     document.getElementById('section-schedule').style.display = section === 'schedule' ? 'block' : 'none';
     document.getElementById('section-highlights').style.display = section === 'highlights' ? 'block' : 'none';
+    document.getElementById('section-standings').style.display = section === 'standings' ? 'block' : 'none';
+
+    if (section === 'standings') loadStandings();
 
     document.querySelectorAll('.nav-pill').forEach(p => p.classList.remove('active'));
     event.target.classList.add('active');
@@ -1390,6 +1583,182 @@ setInterval(() => {
         }
     });
 }, 30000);
+
+// ==================== STANDINGS / KLASEMEN ====================
+let standingsLoaded = false;
+
+const COUNTRY_FLAGS = {
+    'ARG':'🇦🇷','ALG':'🇩🇿','AUS':'🇦🇺','AUT':'🇦🇹','BIH':'🇧🇦','BEL':'🇧🇪',
+    'BRA':'🇧🇷','CAN':'🇨🇦','CMR':'🇨🇲','CHI':'🇨🇱','CHN':'🇨🇳','COL':'🇨🇴',
+    'CRC':'🇨🇷','CRO':'🇭🇷','CUW':'🇨🇼','CZE':'🇨🇿','COD':'🇨🇩','DEN':'🇩🇰',
+    'ECU':'🇪🇨','EGY':'🇪🇬','ENG':'🏴󠁧󠁢󠁥󠁮󠁧󠁿','ESP':'🇪🇸','FRA':'🇫🇷',
+    'GER':'🇩🇪','GHA':'🇬🇭','HAI':'🇭🇹','IRN':'🇮🇷','IRQ':'🇮🇶','IRL':'🇮🇪',
+    'JPN':'🇯🇵','JOR':'🇯🇴','KOR':'🇰🇷','KSA':'🇸🇦','MEX':'🇲🇽','MAR':'🇲🇦',
+    'NED':'🇳🇱','NZL':'🇳🇿','NGA':'🇳🇬','NOR':'🇳🇴','PAN':'🇵🇦','PAR':'🇵🇾',
+    'POR':'🇵🇹','QAT':'🇶🇦','SEN':'🇸🇳','SCO':'🏴󠁧󠁢󠁳󠁣󠁴󠁿','RSA':'🇿🇦',
+    'SUI':'🇨🇭','SWE':'🇸🇪','TUN':'🇹🇳','TUR':'🇹🇷',
+    'USA':'🇺🇸','URU':'🇺🇾','UZB':'🇺🇿','CPV':'🇨🇻',
+    'CIV':'🇨🇮'
+};
+
+const ID_NAMES = {
+    'Argentina':'Argentina','Algeria':'Aljazair','Australia':'Australia','Austria':'Austria',
+    'Bosnia and Herzegovina':'Bosnia Herzegovina','Belgium':'Belgia','Brazil':'Brasil',
+    'Canada':'Kanada','Colombia':'Kolombia','Croatia':'Kroasia','Curaçao':'Curaçao',
+    'Czechia':'Republik Ceko','Congo DR':'Kongo DR',
+    'Ecuador':'Ekuador','Egypt':'Mesir','England':'Inggris','Spain':'Spanyol',
+    'France':'Prancis','Germany':'Jerman','Ghana':'Ghana','Haiti':'Haiti',
+    'IR Iran':'Iran','Iraq':'Irak','Japan':'Jepang','Jordan':'Yordania',
+    'Korea Republic':'Korea Selatan','Mexico':'Meksiko','Morocco':'Maroko',
+    'Netherlands':'Belanda','New Zealand':'Selandia Baru','Norway':'Norwegia',
+    'Panama':'Panama','Paraguay':'Paraguay','Portugal':'Portugal','Qatar':'Qatar',
+    'Saudi Arabia':'Arab Saudi','Scotland':'Skotlandia','Senegal':'Senegal',
+    'Switzerland':'Swiss','Sweden':'Swedia','Türkiye':'Turki','Tunisia':'Tunisia',
+    'Uruguay':'Uruguay','USA':'Amerika Serikat','Uzbekistan':'Uzbekistan',
+    "Côte d'Ivoire":'Pantai Gading','Cabo Verde':'Tanjung Verde'
+};
+
+const FALLBACK_STANDINGS = [
+    {group:'Group A',teams:[
+        {name:'Mexico',abbr:'MEX',pos:1,played:1,won:1,drawn:0,lost:0,for:2,against:0,gd:2,pts:3},
+        {name:'Korea Republic',abbr:'KOR',pos:2,played:1,won:1,drawn:0,lost:0,for:2,against:1,gd:1,pts:3},
+        {name:'Czechia',abbr:'CZE',pos:3,played:1,won:0,drawn:0,lost:1,for:1,against:2,gd:-1,pts:0},
+        {name:'South Africa',abbr:'RSA',pos:4,played:1,won:0,drawn:0,lost:1,for:0,against:2,gd:-2,pts:0}
+    ]},
+    {group:'Group B',teams:[
+        {name:'Switzerland',abbr:'SUI',pos:1,played:1,won:0,drawn:1,lost:0,for:1,against:1,gd:0,pts:1},
+        {name:'Canada',abbr:'CAN',pos:2,played:1,won:0,drawn:1,lost:0,for:1,against:1,gd:0,pts:1},
+        {name:'Qatar',abbr:'QAT',pos:3,played:1,won:0,drawn:1,lost:0,for:1,against:1,gd:0,pts:1},
+        {name:'Bosnia and Herzegovina',abbr:'BIH',pos:4,played:1,won:0,drawn:1,lost:0,for:1,against:1,gd:0,pts:1}
+    ]},
+    {group:'Group C',teams:[
+        {name:'Scotland',abbr:'SCO',pos:1,played:1,won:1,drawn:0,lost:0,for:1,against:0,gd:1,pts:3},
+        {name:'Morocco',abbr:'MAR',pos:2,played:1,won:0,drawn:1,lost:0,for:1,against:1,gd:0,pts:1},
+        {name:'Brazil',abbr:'BRA',pos:3,played:1,won:0,drawn:1,lost:0,for:1,against:1,gd:0,pts:1},
+        {name:'Haiti',abbr:'HAI',pos:4,played:1,won:0,drawn:0,lost:1,for:0,against:1,gd:-1,pts:0}
+    ]},
+    {group:'Group D',teams:[
+        {name:'USA',abbr:'USA',pos:1,played:1,won:1,drawn:0,lost:0,for:4,against:1,gd:3,pts:3},
+        {name:'Australia',abbr:'AUS',pos:2,played:1,won:1,drawn:0,lost:0,for:2,against:0,gd:2,pts:3},
+        {name:'Türkiye',abbr:'TUR',pos:3,played:1,won:0,drawn:0,lost:1,for:0,against:2,gd:-2,pts:0},
+        {name:'Paraguay',abbr:'PAR',pos:4,played:1,won:0,drawn:0,lost:1,for:1,against:4,gd:-3,pts:0}
+    ]},
+    {group:'Group E',teams:[
+        {name:'Germany',abbr:'GER',pos:1,played:1,won:1,drawn:0,lost:0,for:7,against:1,gd:6,pts:3},
+        {name:"Côte d'Ivoire",abbr:'CIV',pos:2,played:1,won:1,drawn:0,lost:0,for:1,against:0,gd:1,pts:3},
+        {name:'Ecuador',abbr:'ECU',pos:3,played:1,won:0,drawn:0,lost:1,for:0,against:1,gd:-1,pts:0},
+        {name:'Curaçao',abbr:'CUW',pos:4,played:1,won:0,drawn:0,lost:1,for:1,against:7,gd:-6,pts:0}
+    ]},
+    {group:'Group F',teams:[
+        {name:'Sweden',abbr:'SWE',pos:1,played:1,won:1,drawn:0,lost:0,for:5,against:1,gd:4,pts:3},
+        {name:'Japan',abbr:'JPN',pos:2,played:1,won:0,drawn:1,lost:0,for:2,against:2,gd:0,pts:1},
+        {name:'Netherlands',abbr:'NED',pos:3,played:1,won:0,drawn:1,lost:0,for:2,against:2,gd:0,pts:1},
+        {name:'Tunisia',abbr:'TUN',pos:4,played:1,won:0,drawn:0,lost:1,for:1,against:5,gd:-4,pts:0}
+    ]},
+    {group:'Group G',teams:[
+        {name:'New Zealand',abbr:'NZL',pos:1,played:1,won:0,drawn:1,lost:0,for:2,against:2,gd:0,pts:1},
+        {name:'IR Iran',abbr:'IRN',pos:2,played:1,won:0,drawn:1,lost:0,for:2,against:2,gd:0,pts:1},
+        {name:'Belgium',abbr:'BEL',pos:3,played:1,won:0,drawn:1,lost:0,for:1,against:1,gd:0,pts:1},
+        {name:'Egypt',abbr:'EGY',pos:4,played:1,won:0,drawn:1,lost:0,for:1,against:1,gd:0,pts:1}
+    ]},
+    {group:'Group H',teams:[
+        {name:'Uruguay',abbr:'URU',pos:1,played:1,won:0,drawn:1,lost:0,for:1,against:1,gd:0,pts:1},
+        {name:'Saudi Arabia',abbr:'KSA',pos:2,played:1,won:0,drawn:1,lost:0,for:1,against:1,gd:0,pts:1},
+        {name:'Spain',abbr:'ESP',pos:3,played:1,won:0,drawn:1,lost:0,for:0,against:0,gd:0,pts:1},
+        {name:'Cabo Verde',abbr:'CPV',pos:4,played:1,won:0,drawn:1,lost:0,for:0,against:0,gd:0,pts:1}
+    ]},
+    {group:'Group I',teams:[
+        {name:'France',abbr:'FRA',pos:1,played:0,won:0,drawn:0,lost:0,for:0,against:0,gd:0,pts:0},
+        {name:'Senegal',abbr:'SEN',pos:2,played:0,won:0,drawn:0,lost:0,for:0,against:0,gd:0,pts:0},
+        {name:'Iraq',abbr:'IRQ',pos:3,played:0,won:0,drawn:0,lost:0,for:0,against:0,gd:0,pts:0},
+        {name:'Norway',abbr:'NOR',pos:4,played:0,won:0,drawn:0,lost:0,for:0,against:0,gd:0,pts:0}
+    ]},
+    {group:'Group J',teams:[
+        {name:'Argentina',abbr:'ARG',pos:1,played:0,won:0,drawn:0,lost:0,for:0,against:0,gd:0,pts:0},
+        {name:'Algeria',abbr:'ALG',pos:2,played:0,won:0,drawn:0,lost:0,for:0,against:0,gd:0,pts:0},
+        {name:'Austria',abbr:'AUT',pos:3,played:0,won:0,drawn:0,lost:0,for:0,against:0,gd:0,pts:0},
+        {name:'Jordan',abbr:'JOR',pos:4,played:0,won:0,drawn:0,lost:0,for:0,against:0,gd:0,pts:0}
+    ]},
+    {group:'Group K',teams:[
+        {name:'Portugal',abbr:'POR',pos:1,played:0,won:0,drawn:0,lost:0,for:0,against:0,gd:0,pts:0},
+        {name:'Congo DR',abbr:'COD',pos:2,played:0,won:0,drawn:0,lost:0,for:0,against:0,gd:0,pts:0},
+        {name:'Uzbekistan',abbr:'UZB',pos:3,played:0,won:0,drawn:0,lost:0,for:0,against:0,gd:0,pts:0},
+        {name:'Colombia',abbr:'COL',pos:4,played:0,won:0,drawn:0,lost:0,for:0,against:0,gd:0,pts:0}
+    ]},
+    {group:'Group L',teams:[
+        {name:'England',abbr:'ENG',pos:1,played:0,won:0,drawn:0,lost:0,for:0,against:0,gd:0,pts:0},
+        {name:'Croatia',abbr:'CRO',pos:2,played:0,won:0,drawn:0,lost:0,for:0,against:0,gd:0,pts:0},
+        {name:'Ghana',abbr:'GHA',pos:3,played:0,won:0,drawn:0,lost:0,for:0,against:0,gd:0,pts:0},
+        {name:'Panama',abbr:'PAN',pos:4,played:0,won:0,drawn:0,lost:0,for:0,against:0,gd:0,pts:0}
+    ]}
+];
+
+function loadStandings() {
+    if (standingsLoaded) return;
+    const container = document.getElementById('standings-container');
+    const sourceEl = document.getElementById('standings-source');
+
+    fetch('https://api.fifa.com/api/v3/calendar/17/285023/289273/standing')
+        .then(r => { if (!r.ok) throw new Error('API error'); return r.json(); })
+        .then(data => {
+            const groups = parseFIFAStandings(data);
+            renderStandings(groups);
+            sourceEl.innerHTML = '<span class="dot"></span><span>FIFA API — Live</span>';
+            standingsLoaded = true;
+        })
+        .catch(err => {
+            console.warn('FIFA API unavailable, using fallback data:', err);
+            renderStandings(FALLBACK_STANDINGS);
+            sourceEl.innerHTML = '<span class="dot offline"></span><span>Fallback — Data terakhir</span>';
+            standingsLoaded = true;
+        });
+}
+
+function parseFIFAStandings(data) {
+    const results = data.Results || [];
+    const groupsMap = {};
+    results.forEach(r => {
+        const groupName = (r.Group && r.Group[0]) ? r.Group[0].Description : 'Unknown';
+        const teamName = (r.Team && r.Team.Name && r.Team.Name[0]) ? r.Team.Name[0].Description : 'Unknown';
+        const abbr = (r.Team) ? r.Team.Abbreviation || '' : '';
+        if (!groupsMap[groupName]) groupsMap[groupName] = [];
+        groupsMap[groupName].push({
+            name: teamName, abbr: abbr, pos: r.Position || 0,
+            played: r.Played || 0, won: r.Won || 0, drawn: r.Drawn || 0,
+            lost: r.Lost || 0, for: r.For || 0, against: r.Against || 0,
+            gd: r.GoalsDiference || 0, pts: r.Points || 0
+        });
+    });
+    return Object.keys(groupsMap).sort().map(g => ({
+        group: g, teams: groupsMap[g].sort((a, b) => a.pos - b.pos)
+    }));
+}
+
+function renderStandings(groups) {
+    const container = document.getElementById('standings-container');
+    let html = '<div class="standings-grid">';
+    groups.forEach(g => {
+        const groupLetter = g.group.replace('Group ', '');
+        html += `<div class="group-card">
+            <div class="group-card-header">
+                <span class="group-letter">${groupLetter}</span>
+                <span>${g.group}</span>
+            </div>
+            <table class="standings-table">
+                <thead><tr><th>#</th><th>Tim</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead>
+                <tbody>${g.teams.map(t => {
+                    const flag = COUNTRY_FLAGS[t.abbr] || '🏳️';
+                    const displayName = ID_NAMES[t.name] || t.name;
+                    const gdClass = t.gd > 0 ? 'gd-positive' : t.gd < 0 ? 'gd-negative' : 'gd-zero';
+                    const gdStr = t.gd > 0 ? '+'+t.gd : t.gd;
+                    return '<tr><td>'+t.pos+'</td><td><div class="team-cell"><span>'+flag+'</span><span>'+displayName+'</span></div></td><td>'+t.played+'</td><td>'+t.won+'</td><td>'+t.drawn+'</td><td>'+t.lost+'</td><td>'+t.for+'</td><td>'+t.against+'</td><td class="'+gdClass+'">'+gdStr+'</td><td class="pts-cell">'+t.pts+'</td></tr>';
+                }).join('')}</tbody>
+            </table>
+        </div>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
 </script>
 
 </body>
