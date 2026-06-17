@@ -957,9 +957,12 @@
     </div>
 
     <div class="sidebar">
-        <div class="sidebar-title">🔴 Pertandingan Hari Ini</div>
+        <div class="sidebar-title">🔴 Pertandingan Hari Ini <span id="data-source" style="font-size:10px;opacity:0.5;text-transform:none;letter-spacing:0;"></span></div>
         <div id="today-matches">
-            <!-- Populated by JS -->
+            <div style="text-align:center;padding:20px;color:var(--gray);font-size:13px;">
+                <div style="font-size:24px;margin-bottom:8px;">⏳</div>
+                Memuat data FIFA API...
+            </div>
         </div>
 
         <div class="sidebar-title" style="margin-top:24px;">⏰ Akan Datang</div>
@@ -1110,8 +1113,132 @@ const STREAM_SOURCES = [
 // HLS.js player instance
 let hlsPlayer = null;
 
-// FIFA World Cup 2026 Schedule
-const MATCHES = [
+// ==================== FIFA API REAL-TIME DATA ====================
+const FIFA_API = 'https://api.fifa.com/api/v3/calendar/17/285023/289273/standing?count=200';
+
+// Team ID → Indonesian name + emoji flag
+const FIFA_TEAMS = {
+    '43911': {name:'Meksiko',flag:'🇲🇽'}, '43883': {name:'Afrika Selatan',flag:'🇿🇦'},
+    '43822': {name:'Korea Selatan',flag:'🇰🇷'}, '43995': {name:'Republik Ceko',flag:'🇨🇿'},
+    '43899': {name:'Kanada',flag:'🇨🇦'}, '44037': {name:'Bosnia Herzegovina',flag:'🇧🇦'},
+    '43960': {name:'Belanda',flag:'🇳🇱'}, '43819': {name:'Jepang',flag:'🇯🇵'},
+    '43924': {name:'Brasil',flag:'🇧🇷'}, '43872': {name:'Maroko',flag:'🇲🇦'},
+    '43948': {name:'Jerman',flag:'🇩🇪'}, '1895293': {name:'Curaçao',flag:'🇨🇼'},
+    '43854': {name:'Pantai Gading',flag:'🇨🇮'}, '43927': {name:'Ekuador',flag:'🇪🇨'},
+    '43921': {name:'Amerika Serikat',flag:'🇺🇸'}, '43928': {name:'Paraguay',flag:'🇵🇾'},
+    '43970': {name:'Swedia',flag:'🇸🇪'}, '43888': {name:'Tunisia',flag:'🇹🇳'},
+    '43976': {name:'Australia',flag:'🇦🇺'}, '43972': {name:'Turki',flag:'🇹🇷'},
+    '43908': {name:'Haiti',flag:'🇭🇹'}, '43967': {name:'Skotlandia',flag:'🏴󠁧󠁢󠁳󠁣󠁴󠁿'},
+    '43834': {name:'Qatar',flag:'🇶🇦'}, '43971': {name:'Swiss',flag:'🇨🇭'},
+    '43969': {name:'Spanyol',flag:'🇪🇸'}, '43850': {name:'Tanjung Verde',flag:'🇨🇻'},
+    '43935': {name:'Belgia',flag:'🇧🇪'}, '43855': {name:'Mesir',flag:'🇪🇬'},
+    '43946': {name:'Prancis',flag:'🇫🇷'}, '43818': {name:'Irak',flag:'🇮🇶'},
+    '43922': {name:'Argentina',flag:'🇦🇷'}, '43843': {name:'Aljazair',flag:'🇩🇿'},
+    '43934': {name:'Austria',flag:'🇦🇹'}, '43820': {name:'Yordania',flag:'🇯🇴'},
+    '43963': {name:'Portugal',flag:'🇵🇹'}, '20014': {name:'Kongo DR',flag:'🇨🇩'},
+    '44005': {name:'Uzbekistan',flag:'🇺🇿'}, '43926': {name:'Kolombia',flag:'🇨🇴'},
+    '43942': {name:'Inggris',flag:'🏴󠁧󠁢󠁥󠁮󠁧󠁿'}, '43938': {name:'Kroasia',flag:'🇭🇷'},
+    '43860': {name:'Ghana',flag:'🇬🇭'}, '43914': {name:'Panama',flag:'🇵🇦'},
+    '43817': {name:'Iran',flag:'🇮🇷'}, '43978': {name:'Selandia Baru',flag:'🇳🇿'},
+    '43835': {name:'Arab Saudi',flag:'🇸🇦'}, '43879': {name:'Senegal',flag:'🇸🇳'},
+    '43961': {name:'Norwegia',flag:'🇳🇴'}, '43930': {name:'Uruguay',flag:'🇺🇾'}
+};
+
+// Group ID → Group name
+const FIFA_GROUPS = {
+    '289275':'Group A','289276':'Group B','289277':'Group C','289278':'Group D',
+    '289279':'Group E','289280':'Group F','289281':'Group G','289282':'Group H',
+    '289283':'Group I','289284':'Group J','289285':'Group K','289286':'Group L'
+};
+
+// Convert UTC to WIB (UTC+7)
+function utcToWIB(utcStr) {
+    const d = new Date(utcStr);
+    d.setHours(d.getHours() + 7);
+    return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+}
+
+function utcDate(utcStr) {
+    const d = new Date(utcStr);
+    d.setHours(d.getHours() + 7);
+    return d.toISOString().split('T')[0];
+}
+
+// FIFA result code → status
+function fifaStatus(result, startTime) {
+    if (result === 4 || result === 5) return 'finished';
+    // Check if match should be live (started but not finished)
+    const now = new Date();
+    const start = new Date(startTime);
+    const end = new Date(start.getTime() + 120*60000); // +120 min
+    if (now >= start && now < end) return 'live';
+    return 'upcoming';
+}
+
+let MATCHES = [];
+let _fifaCache = null;
+let _fifaCacheTime = 0;
+
+async function fetchFIFAMatches() {
+    // Cache for 60 seconds
+    if (_fifaCache && (Date.now() - _fifaCacheTime < 60000)) {
+        MATCHES = _fifaCache;
+        return;
+    }
+    try {
+        const resp = await fetch(FIFA_API);
+        if (!resp.ok) throw new Error('FIFA API error');
+        const data = await resp.json();
+
+        const seen = new Set();
+        const matches = [];
+
+        (data.Results || []).forEach(r => {
+            const groupId = r.IdGroup;
+            const groupName = FIFA_GROUPS[groupId] || 'Unknown';
+
+            (r.MatchResults || []).forEach(m => {
+                const matchId = m.IdMatch;
+                if (seen.has(matchId)) return;
+                seen.add(matchId);
+
+                const homeId = m.HomeTeamId;
+                const awayId = m.AwayTeamId;
+                const home = FIFA_TEAMS[homeId] || {name: homeId, flag:'🏳️'};
+                const away = FIFA_TEAMS[awayId] || {name: awayId, flag:'🏳️'};
+                const status = fifaStatus(m.Result, m.StartTime);
+
+                matches.push({
+                    id: 'f' + matchId,
+                    home: home.name, homeFlag: home.flag,
+                    away: away.name, awayFlag: away.flag,
+                    date: utcDate(m.StartTime),
+                    time: utcToWIB(m.StartTime),
+                    group: groupName, venue: '',
+                    status: status,
+                    homeScore: m.HomeTeamScore != null ? m.HomeTeamScore : (status !== 'upcoming' ? 0 : undefined),
+                    awayScore: m.AwayTeamScore != null ? m.AwayTeamScore : (status !== 'upcoming' ? 0 : undefined)
+                });
+            });
+        });
+
+        matches.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+        MATCHES = matches;
+        _fifaCache = matches;
+        _fifaCacheTime = Date.now();
+        console.log(`[FIFA API] Loaded ${matches.length} matches`);
+        const ds = document.getElementById('data-source');
+        if (ds) ds.textContent = '· FIFA API ✓';
+    } catch (err) {
+        console.warn('[FIFA API] Failed, keeping existing data:', err);
+        if (MATCHES.length === 0) MATCHES = FALLBACK_MATCHES;
+        const ds = document.getElementById('data-source');
+        if (ds) ds.textContent = '· fallback';
+    }
+}
+
+// Fallback data (in case FIFA API is unreachable)
+const FALLBACK_MATCHES = [
     // ==================== MATCHDAY 1 - June 11 (FINISHED) ====================
     {
         id: "m01",
@@ -1369,12 +1496,37 @@ let currentSource = 0;
 let chatVisible = false;
 
 // ==================== INIT ====================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Fetch real-time data from FIFA API first
+    await fetchFIFAMatches();
     renderTodayMatches();
     renderUpcomingMatches();
     renderSchedule();
     renderDaySelector();
     autoSelectLiveMatch();
+
+    // Auto-refresh from FIFA API every 60 seconds
+    setInterval(async () => {
+        await fetchFIFAMatches();
+        renderTodayMatches();
+        renderUpcomingMatches();
+        renderSchedule();
+        // Re-render schedule grid if visible
+        const activeDay = document.querySelector('.day-btn.active');
+        if (activeDay) activeDay.click();
+        // Update current match info if watching
+        if (currentMatch) {
+            const updated = MATCHES.find(m => m.id === currentMatch.id);
+            if (updated) {
+                currentMatch = updated;
+                const infoEl = document.getElementById('current-match-info');
+                if (infoEl.style.display !== 'none') {
+                    document.getElementById('match-title').textContent =
+                        `${updated.homeFlag} ${updated.home} vs ${updated.away} ${updated.awayFlag}`;
+                }
+            }
+        }
+    }, 60000);
 });
 
 // ==================== RENDER ====================
@@ -1772,20 +1924,7 @@ function showToast(msg) {
     setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
-// Auto-refresh live scores (simulated)
-setInterval(() => {
-    MATCHES.forEach(m => {
-        if (m.status === 'live') {
-            // Simulate score updates
-            if (Math.random() > 0.95) {
-                if (Math.random() > 0.5) m.homeScore++;
-                else m.awayScore++;
-                renderTodayMatches();
-                showToast(`⚽ GOAL! ${m.home} ${m.homeScore} - ${m.awayScore} ${m.away}`);
-            }
-        }
-    });
-}, 30000);
+// Real-time score refresh is handled in DOMContentLoaded via FIFA API (every 60s)
 
 // ==================== STANDINGS / KLASEMEN ====================
 let standingsLoaded = false;
